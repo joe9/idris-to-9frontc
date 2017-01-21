@@ -49,6 +49,7 @@ import System.Exit
 import System.FilePath (addTrailingPathSeparator, (</>))
 import System.IO
 import System.Process
+import Text.Groom
 
 -- |  Compile to simplified forms and return CodegenInfo
 compile :: Codegen -> FilePath -> Maybe Term -> Idris CodegenInfo
@@ -62,8 +63,10 @@ compile codegen f mtm = do
                              Nothing -> []
                              Just t -> freeNames t
 
+        showContext
         reachableNames <- performUsageAnalysis
                               (rootNames ++ getExpNames exports)
+--         let reachableNames = (rootNames ++ getExpNames exports)
         maindef <- case mtm of
                         Nothing -> return []
                         Just tm -> do md <- irMain tm
@@ -694,27 +697,27 @@ showContext :: Idris ()
 showContext
     = do i <- getIState
          runIO (putStrLn $ "showInterfaces begin ------------------------------------")
-         runIO (putStrLn $ show (idris_interfaces i))
+         runIO (putStrLn $ groom (idris_interfaces i))
          runIO (putStrLn $ "showInterfaces end  -------------------------------------")
          runIO (putStrLn $ "showRecords begin ------------------------------------")
-         runIO (putStrLn $ show (idris_records i))
+         runIO (putStrLn $ groom (idris_records i))
          runIO (putStrLn $ "showRecords end  -------------------------------------")
          runIO (putStrLn $ "showDsls begin ------------------------------------")
-         runIO (putStrLn $ show (idris_dsls i))
+         runIO (putStrLn $ groom (idris_dsls i))
          runIO (putStrLn $ "showDsls end  -------------------------------------")
          runIO (putStrLn $ "showDataTypes begin ------------------------------------")
-         runIO (putStrLn $ show (idris_datatypes i))
+         runIO (putStrLn $ groom (idris_datatypes i))
          runIO (putStrLn $ "showDataTypes end  -------------------------------------")
          runIO (putStrLn $ "showCallGraph begin ------------------------------------")
-         runIO (putStrLn $ show (idris_callgraph i))
+         runIO (putStrLn $ groom (idris_callgraph i))
          runIO (putStrLn $ "showCallGraph end  -------------------------------------")
          runIO (putStrLn $ "showTyinfodata begin ------------------------------------")
-         runIO (putStrLn $ show (idris_tyinfodata i))
+         runIO (putStrLn $ groom (idris_tyinfodata i))
          runIO (putStrLn $ "showTyinfodata end  -------------------------------------")
          runIO (putStrLn $ "showFninfo begin ------------------------------------")
-         runIO (putStrLn $ show (idris_fninfo i))
+         runIO (putStrLn $ groom (idris_fninfo i))
          runIO (putStrLn $ "showFninfo end  -------------------------------------")
          runIO (putStrLn $ "showName begin ------------------------------------")
-         runIO (putStrLn $ show (idris_name i))
+         runIO (putStrLn $ groom (idris_name i))
          runIO (putStrLn $ "showName end  -------------------------------------")
          return ()

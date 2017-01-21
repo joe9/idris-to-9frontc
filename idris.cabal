@@ -291,6 +291,7 @@ Library
                 , zip-archive > 0.2.3.5 && < 0.4
                 , fsnotify >= 0.2 && < 2.2
                 , async < 2.2
+                , groom
 
 
   -- zlib >= 0.6.1 is broken with GHC < 7.10.3
