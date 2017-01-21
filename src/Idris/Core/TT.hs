@@ -1564,7 +1564,8 @@ newtype WkEnvTT n = Wk (EnvTT n)
 type WkEnv = WkEnvTT Name
 
 instance (Eq n, Show n) => Show (TT n) where
-    show t = showEnv [] t
+    show t = showEnvDbg [] t
+--     show t = showEnv [] t
 
 itBitsName IT8 = "Bits8"
 itBitsName IT16 = "Bits16"

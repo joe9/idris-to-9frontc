@@ -767,7 +767,7 @@ data CaseDefs = CaseDefs {
                   cases_compiletime :: !([Name], SC),
                   cases_runtime :: !([Name], SC)
                 }
-  deriving Generic
+  deriving (Show, Generic)
 
 data CaseInfo = CaseInfo {
                   case_inlinable :: Bool, -- decided by machine
@@ -790,16 +790,20 @@ instance Show Def where
     show (Function ty tm) = "Function: " ++ show (ty, tm)
     show (TyDecl nt ty) = "TyDecl: " ++ show nt ++ " " ++ show ty
     show (Operator ty _ _) = "Operator: " ++ show ty
-    show (CaseOp (CaseInfo inlc inla inlr) ty atys ps_in ps cd)
+    show (CaseOp (CaseInfo inlc inla tcb) ty atys ps_in ps cd)
       = let (ns, sc) = cases_compiletime cd
             (ns', sc') = cases_runtime cd in
-          "Case: " ++ show ty ++ " " ++ show ps ++ "\n" ++
+          "Case: type = " ++ show ty ++ "\n" ++
+              ", argument types = " ++ show atys ++ "\n" ++
+              ", original  definition = " ++ show ps_in ++ "\n" ++
+              ", simplified totality check definition = " ++ show ps ++ "\n" ++
                                         "COMPILE TIME:\n\n" ++
                                         show ns ++ " " ++ show sc ++ "\n\n" ++
                                         "RUN TIME:\n\n" ++
                                         show ns' ++ " " ++ show sc' ++ "\n\n" ++
             if inlc then "Inlinable" else "Not inlinable" ++
-            if inla then " Aggressively\n" else "\n"
+            if inla then " Aggressively\n" else "\n" ++
+            " tc_dictionary: " ++ show tcb ++ "\n"
 
 -------
 

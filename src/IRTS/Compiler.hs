@@ -74,6 +74,7 @@ compile codegen f mtm = do
         flags <- getFlags codegen
         hdrs <- getHdrs codegen
         impdirs <- allImportDirs
+--         showContext
         ttDeclarations <- getDeclarations reachableNames
         defsIn <- mkDecls reachableNames
         -- if no 'main term' given, generate interface files
@@ -214,6 +215,9 @@ build (n, d)
                                          (LOp op (map (LV . Glob) (take ar args)))))
               _ -> do def <- mkLDecl n d
                       logCodeGen 3 $ "Compiled " ++ show n ++ " =\n\t" ++ show def
+                      logCodeGen 3 $ "Compiled: Name " ++ show n
+                                        ++ ", Def " ++ show d
+                                        ++ " =\n\t" ++ show def
                       return (n, def)
    where getPrim n i
              | Just (ar, op) <- lookup n (idris_scprims i)
@@ -527,7 +531,7 @@ doForeign vs env xs = ifail "Badly formed foreign function call"
 
 irTree :: Name -> [Name] -> SC -> Idris LExp
 irTree top args tree = do
-    logCodeGen 3 $ "Compiling " ++ show args ++ "\n" ++ show tree
+    logCodeGen 3 $ "Compiling in irTree " ++ show args ++ "\n" ++ show tree
     LLam args <$> irSC top M.empty tree
 
 irSC :: Name -> Vars -> SC -> Idris LExp
@@ -685,3 +689,32 @@ irAlt top vs _ (ConstCase c rhs)
 
 irAlt top vs _ (DefaultCase rhs)
     = LDefaultCase <$> irSC top vs rhs
+
+showContext :: Idris ()
+showContext
+    = do i <- getIState
+         runIO (putStrLn $ "showInterfaces begin ------------------------------------")
+         runIO (putStrLn $ show (idris_interfaces i))
+         runIO (putStrLn $ "showInterfaces end  -------------------------------------")
+         runIO (putStrLn $ "showRecords begin ------------------------------------")
+         runIO (putStrLn $ show (idris_records i))
+         runIO (putStrLn $ "showRecords end  -------------------------------------")
+         runIO (putStrLn $ "showDsls begin ------------------------------------")
+         runIO (putStrLn $ show (idris_dsls i))
+         runIO (putStrLn $ "showDsls end  -------------------------------------")
+         runIO (putStrLn $ "showDataTypes begin ------------------------------------")
+         runIO (putStrLn $ show (idris_datatypes i))
+         runIO (putStrLn $ "showDataTypes end  -------------------------------------")
+         runIO (putStrLn $ "showCallGraph begin ------------------------------------")
+         runIO (putStrLn $ show (idris_callgraph i))
+         runIO (putStrLn $ "showCallGraph end  -------------------------------------")
+         runIO (putStrLn $ "showTyinfodata begin ------------------------------------")
+         runIO (putStrLn $ show (idris_tyinfodata i))
+         runIO (putStrLn $ "showTyinfodata end  -------------------------------------")
+         runIO (putStrLn $ "showFninfo begin ------------------------------------")
+         runIO (putStrLn $ show (idris_fninfo i))
+         runIO (putStrLn $ "showFninfo end  -------------------------------------")
+         runIO (putStrLn $ "showName begin ------------------------------------")
+         runIO (putStrLn $ show (idris_name i))
+         runIO (putStrLn $ "showName end  -------------------------------------")
+         return ()
