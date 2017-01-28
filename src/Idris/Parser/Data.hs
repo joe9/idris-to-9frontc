@@ -214,7 +214,7 @@ data_ syn = checkDeclFixity $
                      reservedHL "where"
                      cons <- indentedBlock (constructor syn)
                      accData acc tyn (map (\ (_, _, n, _, _, _, _) -> n) cons)
-                     return $ PData doc argDocs syn fc dataOpts (PDatadecl tyn nfc ty cons))
+                     return $ (trace "in data_ 1: ") (traceShowId (PData doc argDocs syn fc dataOpts (PDatadecl tyn nfc ty cons))))
                    terminator
                    return d) <|> (do
                     args <- many (do notEndApp

@@ -2257,6 +2257,18 @@ showDImp :: PPOption -> PData -> Doc OutputAnnotation
 showDImp ppo (PDatadecl n nfc ty cons)
  = text "data" <+> text (show n) <+> colon <+> prettyImp ppo ty <+> text "where" <$>
     (indent 2 $ vsep (map (\ (_, _, n, _, t, _, _) -> pipe <+> prettyName True False [] n <+> colon <+> prettyImp ppo t) cons))
+  <+> line <+> text "C translation:" <+> line
+  <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <+> semi <+> line
+  <+> text "typedef struct " <+> tocname n
+  <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <+> semi <+> line
+              <+> text "union " <+> braces (semiBraces (map (\ (_, _, n, _, t, _, _) -> tocname n <+> space <+> text " type ") cons) ) <+> semi <+> line
+             )
+  <+> semi
+
+tocname :: Name -> Doc OutputAnnotation
+tocname = text . concatMap cchar . show
+  where cchar x | isAlpha x || isDigit x = [x]
+                | otherwise = "_" ++ show (fromEnum x) ++ "_"
 
 showDecls :: PPOption -> [PDecl] -> Doc OutputAnnotation
 showDecls o ds = vsep (map (showDeclImp o) ds)
