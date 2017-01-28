@@ -1,2 +1,9 @@
-:set -XMultiParamTypeClasses -XFunctionalDependencies
-:set -XFlexibleInstances -XTemplateHaskell
+
+-- from https://github.com/idris-lang/Idris-dev/blob/735fbd21eae2c2b79b757ad68b4cbbbfc592fcd0/idris.cabal#L312
+:set -XMultiParamTypeClasses
+:set -XDeriveFoldable
+:set -XDeriveTraversable
+:set -XFunctionalDependencies
+:set -XFlexibleContexts
+:set -XFlexibleInstances
+:set -XTemplateHaskell
