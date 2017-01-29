@@ -1133,12 +1133,12 @@ data PTerm = PQuote Raw         -- ^ Inclusion of a core term into the
            | PConstSugar FC PTerm
              -- ^ A desugared constant. The FC is a precise source
              -- location that will be used to highlight it later.
-       deriving (Eq, Ord, Data, Typeable, Generic)
+       deriving (Eq, Ord, Data, Typeable, Generic, Show)
 
 data PAltType = ExactlyOne Bool -- ^ flag sets whether delay is allowed
               | FirstSuccess
               | TryImplicit
-       deriving (Eq, Ord, Data, Generic, Typeable)
+       deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
 -- | Transform the FCs in a PTerm. The first function transforms the
 -- general-purpose FCs, and the second transforms those that are used
@@ -1307,6 +1307,9 @@ data PDo' t = DoExp  FC t
 {-!
 deriving instance Binary PDo'
 !-}
+
+instance Show (PDo' t) where
+  show _ = "PDo' .."
 
 instance Sized a => Sized (PDo' a) where
   size (DoExp fc t)           = 1 + size fc + size t
@@ -1732,8 +1735,8 @@ piBindp p ((n, ty):ns) t = PPi p n NoFC ty (piBindp p ns t)
 -- These "show" implementations render to an absurdly wide screen because inserted line breaks
 -- could interfere with interactive editing, which calls "show".
 
-instance Show PTerm where
-  showsPrec _ tm = (displayS . renderPretty 1.0 10000000 . prettyImp defaultPPOption) tm
+-- instance Show PTerm where
+--   showsPrec _ tm = (displayS . renderPretty 1.0 10000000 . prettyImp defaultPPOption) tm
 
 instance Show PDecl where
   showsPrec _ d = (displayS . renderPretty 1.0 10000000 . showDeclImp verbosePPOption) d
@@ -2258,12 +2261,66 @@ showDImp ppo (PDatadecl n nfc ty cons)
  = text "data" <+> text (show n) <+> colon <+> prettyImp ppo ty <+> text "where" <$>
     (indent 2 $ vsep (map (\ (_, _, n, _, t, _, _) -> pipe <+> prettyName True False [] n <+> colon <+> prettyImp ppo t) cons))
   <+> line <+> text "C translation:" <+> line
-  <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <+> semi <+> line
+  <+> text "typedef enum " <+> encloseSep lbrace rbrace comma (map (\ (_, _, n, _, _, _, _) -> tocname n) cons) <+> tocname n <> text "Constructor" <> semi <> line
+  <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
   <+> text "typedef struct " <+> tocname n
-  <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <+> semi <+> line
-              <+> text "union " <+> braces (semiBraces (map (\ (_, _, n, _, t, _, _) -> tocname n <+> space <+> text " type ") cons) ) <+> semi <+> line
-             )
-  <+> semi
+  <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <> semi <+> line
+              <+> text "union"
+              <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi
+  <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
+
+isNullConstructor :: PTerm -> Bool
+isNullConstructor (PRef _ _ _) = True
+isNullConstructor _ = False
+
+toUnionMember ::
+  (Docstring (Either Err PTerm), [(Name, Docstring (Either Err PTerm))], Name, FC, PTerm, FC, [Name])
+  -> Doc OutputAnnotation
+toUnionMember (_, _, n, _, t, _, _)
+   | isNullConstructor t = empty
+   | otherwise = cType t (Left n)
+
+-- allBuiltInDataTypesConstructor :: PTerm -> Bool
+
+cType :: PTerm -> Either Name [Integer] -> Doc OutputAnnotation
+cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
+cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Right (i : _)) =
+  cBuiltinDataType t1 <+> text ("arg" ++ show i) <> semi
+cType (PPi _ _ _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
+  text "struct " <+> braces (cBuiltinDataType t <+> text "arg1" <> semi <+> cType p (Right [2 ..])) <+> tocname n <> semi
+cType (PPi _ _ _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Right (i : is)) =
+  cBuiltinDataType t <+> text "arg" <> tshow i <> semi <+> cType p (Right is)
+--   *Idris.AbsSyntax > map (\i -> "arg" ++  show i) [(1 :: Integer) .. 10]
+-- cType (PTrue c u) = text "PTrue " <+> text (show c) <+> space <+> text (show u)
+-- cType (PConstant _ c) (Left n) = cBuiltinDataType c <+> tocname n <> semi
+-- cType (PTyped t1 t2) = text "PTyped " <+> text (show t1) <+> text (show t2)
+-- cType (PApp _ t args) = text "PApp " <+> text (show t) <+> text (show args)
+-- cType (PRef _ _ n) = text (show n) -- for types defined in Idris
+cType t n = text "cType: unknown PTerm " <+> tshow t <+> tshow n <> semi
+
+tshow :: Show a => a -> Doc OutputAnnotation
+tshow = text . show
+
+cBuiltinDataType :: Const -> Doc OutputAnnotation
+cBuiltinDataType (I i) = tshow i
+cBuiltinDataType (BI i) = tshow i
+cBuiltinDataType (Fl f) = tshow f
+cBuiltinDataType (Ch c) = tshow c
+cBuiltinDataType (Idris.Core.TT.Str s) = tshow s
+cBuiltinDataType (B8 x) = tshow x
+cBuiltinDataType (B16 x) = tshow x
+cBuiltinDataType (B32 x) = tshow x
+cBuiltinDataType (B64 x) = tshow x
+cBuiltinDataType (AType ATFloat) = text "double"
+cBuiltinDataType (AType (ATInt ITBig)) = text "int"
+cBuiltinDataType (AType (ATInt ITNative)) = text "int"
+cBuiltinDataType (AType (ATInt ITChar)) = text "char"
+cBuiltinDataType (AType (ATInt (ITFixed it))) = text "itBitsName it"
+cBuiltinDataType TheWorld = text "prim__TheWorld"
+cBuiltinDataType WorldType = text "prim__WorldType"
+cBuiltinDataType StrType = text "String"
+cBuiltinDataType VoidType = text "Void"
+cBuiltinDataType Forgot = text "Forgot"
 
 tocname :: Name -> Doc OutputAnnotation
 tocname = text . concatMap cchar . show
