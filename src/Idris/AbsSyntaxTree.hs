@@ -2257,17 +2257,27 @@ showCImp ppo (PWith _ n l ws r pn w)
 
 
 showDImp :: PPOption -> PData -> Doc OutputAnnotation
-showDImp ppo (PDatadecl n nfc ty cons)
+showDImp ppo pd@(PDatadecl n nfc ty cons)
  = text "data" <+> text (show n) <+> colon <+> prettyImp ppo ty <+> text "where" <$>
     (indent 2 $ vsep (map (\ (_, _, n, _, t, _, _) -> pipe <+> prettyName True False [] n <+> colon <+> prettyImp ppo t) cons))
-  <+> line <+> text "C translation:" <+> line
-  <+> text "typedef enum " <+> encloseSep lbrace rbrace comma (map (\ (_, _, n, _, _, _, _) -> tocname n) cons) <+> tocname n <> text "Constructor" <> semi <> line
-  <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
-  <+> text "typedef struct " <+> tocname n
-  <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <> semi <+> line
-              <+> text "union"
-              <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi <> line
-  <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
+  <+> line <+> text "C translation:" <+> line <+> dataCTranslation pd
+
+dataCTranslation :: PData -> Doc OutputAnnotation
+dataCTranslation (PDatadecl n nfc ty cons)
+  | length cons == 0 = text "dataCTranslation cons length == 0"
+  | length cons == 1 =
+        text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
+        <+> text "typedef struct " <+> tocname n
+        <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi<> line
+        <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
+  | length cons > 1 =
+        text "typedef enum " <+> encloseSep lbrace rbrace comma (map (\ (_, _, n, _, _, _, _) -> tocname n) cons) <+> tocname n <> text "Constructor" <> semi <> line
+        <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
+        <+> text "typedef struct " <+> tocname n
+        <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <> semi <+> line
+                    <+> text "union"
+                    <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi <> line
+        <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
 
 isNullConstructor :: PTerm -> Bool
 isNullConstructor (PRef _ _ _) = True
