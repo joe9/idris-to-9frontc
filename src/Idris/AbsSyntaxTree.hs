@@ -2295,6 +2295,8 @@ toUnionMember (_, _, n, _, t, _, _)
 cType :: PTerm -> Either Name [Integer] -> Doc OutputAnnotation
 cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
 cType (PPi _ _ _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
+cType (PPi _ n _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (Right (i : _)) =
+  cBuiltinDataType t1 <+> buildName n i <> semi
 cType (PPi _ n _ (PConstant _ t1) (PRef _ _ _)) (Right (i : _)) =
   cBuiltinDataType t1 <+> buildName n i <> semi
 cType (PPi _ an _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
