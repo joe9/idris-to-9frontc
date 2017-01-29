@@ -2266,18 +2266,18 @@ dataCTranslation :: PData -> Doc OutputAnnotation
 dataCTranslation (PDatadecl n nfc ty cons)
   | length cons == 0 = text "dataCTranslation cons length == 0"
   | length cons == 1 =
-        text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
+        text "raw " <> semiBraces (map (text . show) cons) <+> line
+        <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
         <+> text "typedef struct " <+> tocname n
         <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi<> line
-        <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
   | length cons > 1 =
-        text "typedef enum " <+> encloseSep lbrace rbrace comma (map (\ (_, _, n, _, _, _, _) -> tocname n) cons) <+> tocname n <> text "Constructor" <> semi <> line
+        text "raw " <> semiBraces (map (text . show) cons) <+> line
+        <+> text "typedef enum " <+> encloseSep lbrace rbrace comma (map (\ (_, _, n, _, _, _, _) -> tocname n) cons) <+> tocname n <> text "Constructor" <> semi <> line
         <+> text "typedef struct " <+> tocname n <+> space <+> tocname n <> semi <> line
         <+> text "typedef struct " <+> tocname n
         <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <> semi <+> line
                     <+> text "union"
                     <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi <> line
-        <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
 
 isNullConstructor :: PTerm -> Bool
 isNullConstructor (PRef _ _ _) = True
@@ -2294,19 +2294,26 @@ toUnionMember (_, _, n, _, t, _, _)
 
 cType :: PTerm -> Either Name [Integer] -> Doc OutputAnnotation
 cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
-cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Right (i : _)) =
-  cBuiltinDataType t1 <+> text ("arg" ++ show i) <> semi
-cType (PPi _ _ _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
-  text "struct " <+> braces (cBuiltinDataType t <+> text "arg1" <> semi <+> cType p (Right [2 ..])) <+> tocname n <> semi
-cType (PPi _ _ _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Right (i : is)) =
-  cBuiltinDataType t <+> text "arg" <> tshow i <> semi <+> cType p (Right is)
+cType (PPi _ _ _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
+cType (PPi _ n _ (PConstant _ t1) (PRef _ _ _)) (Right (i : _)) =
+  cBuiltinDataType t1 <+> buildName n i <> semi
+cType (PPi _ an _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
+  text "struct " <+> braces (cBuiltinDataType t <+> buildName an 1 <> semi <+> cType p (Right [2 ..])) <+> tocname n <> semi
+cType (PPi _ n _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Right (i : is)) =
+  cBuiltinDataType t <+> buildName n i <> semi <+> cType p (Right is)
 --   *Idris.AbsSyntax > map (\i -> "arg" ++  show i) [(1 :: Integer) .. 10]
 -- cType (PTrue c u) = text "PTrue " <+> text (show c) <+> space <+> text (show u)
 -- cType (PConstant _ c) (Left n) = cBuiltinDataType c <+> tocname n <> semi
 -- cType (PTyped t1 t2) = text "PTyped " <+> text (show t1) <+> text (show t2)
 -- cType (PApp _ t args) = text "PApp " <+> text (show t) <+> text (show args)
 -- cType (PRef _ _ n) = text (show n) -- for types defined in Idris
-cType t n = text "cType: unknown PTerm " <+> tshow t <+> tshow n <> semi
+cType t (Left n) = text "cType: unknown PTerm " <+> tshow t <+> tshow n <> semi
+cType t _  = text "cType: unknown PTerm " <+> tshow t <> semi
+
+buildName :: Name -> Integer -> Doc OutputAnnotation
+buildName n i
+  | show n == "__pi_arg" = text ("__pi_arg" ++ show i)
+  | otherwise = tshow n
 
 tshow :: Show a => a -> Doc OutputAnnotation
 tshow = text . show
