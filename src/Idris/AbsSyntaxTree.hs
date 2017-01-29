@@ -2266,7 +2266,7 @@ showDImp ppo (PDatadecl n nfc ty cons)
   <+> text "typedef struct " <+> tocname n
   <+> braces (tocname n <> text "Constructor" <+> space <+> text "constructor" <> semi <+> line
               <+> text "union"
-              <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi
+              <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi <> line
   <+> text "raw " <> semiBraces (map (text . show) cons) <+> line
 
 isNullConstructor :: PTerm -> Bool
