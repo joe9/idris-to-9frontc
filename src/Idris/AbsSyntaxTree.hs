@@ -2279,40 +2279,36 @@ dataCTranslation (PDatadecl n nfc ty cons)
                     <+> text "union"
                     <+> encloseSep lbrace rbrace space (map toUnionMember cons) <> semi) <> semi <> line
 
-isNullConstructor :: PTerm -> Bool
-isNullConstructor (PRef _ _ _) = True
-isNullConstructor _ = False
-
 toUnionMember ::
   (Docstring (Either Err PTerm), [(Name, Docstring (Either Err PTerm))], Name, FC, PTerm, FC, [Name])
   -> Doc OutputAnnotation
-toUnionMember (_, _, n, _, t, _, _)
-   | isNullConstructor t = empty
-   | otherwise = cType t (Left n)
+toUnionMember (_, _, _, _, (PRef _ _ _), _, _) = empty
+  -- for single field constructors, avoid using a struct
+toUnionMember (_, _, n, _, (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)), _, _) =
+  cBuiltinDataType t1 <+> tocname n <> semi
+  -- for single field constructors, avoid using a struct
+toUnionMember (_, _, n, _, (PPi _ _ _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)), _, _) =
+  cBuiltinDataType t1 <+> tocname n <> semi
+toUnionMember (_, _, n, _, p@(PPi _ _ _ _ _), _, _) =
+  text "struct " <+> braces (cType p [1 ..]) <+> tocname n <> semi
 
--- allBuiltInDataTypesConstructor :: PTerm -> Bool
-
-cType :: PTerm -> Either Name [Integer] -> Doc OutputAnnotation
-cType (PPi _ _ _ (PConstant _ t1) (PRef _ _ _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
-cType (PPi _ _ _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (Left n) = cBuiltinDataType t1 <+> tocname n <> semi
-cType (PPi _ n _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (Right (i : _)) =
-  cBuiltinDataType t1 <+> buildName n i <> semi
-cType (PPi _ n _ (PConstant _ t1) (PRef _ _ _)) (Right (i : _)) =
-  cBuiltinDataType t1 <+> buildName n i <> semi
-cType (PPi _ an _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
-  text "struct " <+> braces (cBuiltinDataType t <+> buildName an 1 <> semi <+> cType p (Right [2 ..])) <+> tocname n <> semi
-cType (PPi _ n _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Right (i : is)) =
-  cBuiltinDataType t <+> buildName n i <> semi <+> cType p (Right is)
---   *Idris.AbsSyntax > map (\i -> "arg" ++  show i) [(1 :: Integer) .. 10]
+-- this function only for multiple field constructors
+cType :: PTerm -> [Integer] -> Doc OutputAnnotation
+cType (PPi _ n _ (PConstant _ t1) (PRef _ _ _)) (x : xs) = cBuiltinDataType t1 <+> buildName n x <> semi
+cType (PPi _ n _ (PConstant _ t1) (PApp _ (PRef _ _ _) _)) (x : xs) = cBuiltinDataType t1 <+> buildName n x <> semi
+cType (PPi _ n _ (PConstant _ t) p@(PPi _ _ _ _ _)) (x : xs) =
+  cBuiltinDataType t <+> buildName n x <> semi <+> cType p xs
+cType t _  = text "cType: unknown PTerm " <+> tshow t <> semi
+-- cType (PPi _ an _ (PConstant _ t) p@(PPi _ _ _ _ _)) (Left n) =
+--   text "struct " <+> braces (cBuiltinDataType t <+> buildName an 1 <> semi <+> cType p (Right [2 ..])) <+> tocname n <> semi
 -- cType (PTrue c u) = text "PTrue " <+> text (show c) <+> space <+> text (show u)
 -- cType (PConstant _ c) (Left n) = cBuiltinDataType c <+> tocname n <> semi
 -- cType (PTyped t1 t2) = text "PTyped " <+> text (show t1) <+> text (show t2)
 -- cType (PApp _ t args) = text "PApp " <+> text (show t) <+> text (show args)
 -- cType (PRef _ _ n) = text (show n) -- for types defined in Idris
-cType t (Left n) = text "cType: unknown PTerm " <+> tshow t <+> tshow n <> semi
-cType t _  = text "cType: unknown PTerm " <+> tshow t <> semi
 
 buildName :: Name -> Integer -> Doc OutputAnnotation
+buildName (MN j s) i = text (str s ++ show j ++ show i)
 buildName n i
   | show n == "__pi_arg" = text ("__pi_arg" ++ show i)
   | otherwise = tshow n
