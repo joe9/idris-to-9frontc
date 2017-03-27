@@ -23,8 +23,6 @@ import Idris.REPL.Commands
 import Idris.REPL.Parser
 import IRTS.CodegenCommon
 
-import CmdOptions
-
 import Util.System
 
 import Control.Category
@@ -38,22 +36,23 @@ import Prelude hiding (id, (.), (<$>))
 import System.Console.Haskeline as H
 import System.Directory
 import System.Exit
+import System.Environment (getArgs)
 import System.FilePath
 import System.IO
 import Text.Trifecta.Result (ErrInfo(..), Result(..))
 
 -- | The main function for the executable.
-runIdris :: [Opt] -> Idris ()
-runIdris opts = do
-  runIO setupBundledCC
-  idrisMain opts             -- Launch REPL or compile mode.
-
 -- Main program reads command line options, parses the main program, and gets
 -- on with the REPL.
 main :: IO ()
 main = do
-  opts <- runArgParser
-  runMain (runIdris opts)
+  args <- getArgs
+  putStrLn (show args)
+--   putStrLn ("command line arguments: " <> show args)
+--   numCapabilities <- getNumCapabilities
+--   putStrLn ("number of cores: " <> show numCapabilities)
+--   runMain opts -- Launch REPL or compile mode.
+  return ()
 
 -- | How to run Idris programs.
 runMain :: Idris () -> IO ()
