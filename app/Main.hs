@@ -15,12 +15,14 @@ import Idris.ElabDecls
 import Idris.Error
 import Idris.IBC
 import Idris.Info
+import Idris.Main (runMain)
 import Idris.ModeCommon
 import Idris.Output
 import Idris.Parser hiding (indent)
 import Idris.REPL
 import Idris.REPL.Commands
 import Idris.REPL.Parser
+import Idris.REPL.Browse
 import IRTS.CodegenCommon
 
 import Util.System
@@ -47,21 +49,37 @@ import Text.Trifecta.Result (ErrInfo(..), Result(..))
 main :: IO ()
 main = do
   args <- getArgs
-  putStrLn (show args)
---   putStrLn ("command line arguments: " <> show args)
+  putStrLn ("command line arguments: " ++ show args)
 --   numCapabilities <- getNumCapabilities
 --   putStrLn ("number of cores: " <> show numCapabilities)
---   runMain opts -- Launch REPL or compile mode.
-  return ()
+  mapM_ (runMain . translateFile) args -- Launch REPL or compile mode.
 
--- | How to run Idris programs.
-runMain :: Idris () -> IO ()
-runMain prog = do res <- runExceptT $ execStateT prog idrisInit
-                  case res of
-                       Left err -> do
-                         putStrLn $ "Uncaught error: " ++ show err
-                         exitFailure
-                       Right _ -> return ()
+translateFile :: String -> Idris ()
+translateFile filename =
+  -- The $!! here prevents a space leak on reloading.
+  -- This isn't a solution - but it's a temporary stopgap.
+  -- See issue #2386
+  do elabPrims
+     i <- getIState
+     clearErr
+     mods <- loadInputs [filename] Nothing
+     -- Report either success or failure
+     i <- getIState
+     case (errSpan i) of
+       Nothing -> runIO . putStrLn $ "no errors"
+       Just x -> iPrintError $ "didn't load " ++ filename
+     names <- namesInNS []
+     (runIO . putStrLn . show) names
+     names <- namesInNS ns
+     if null names
+        then iPrintError "Invalid or empty namespace"
+        else do ist <- getIState
+                iRenderResult $
+                  text "Names:" <$>
+                  indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
+                                             (group . align $ pprintDelabTy ist n))
+                                      names))
+     return ()
 
 -- | The main function of Idris that when given a set of Options will
 -- launch Idris into the desired interaction mode either: REPL;
