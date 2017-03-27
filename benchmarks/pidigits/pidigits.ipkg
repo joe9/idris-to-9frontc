@@ -1,6 +1,0 @@
-package pidigits
-
-modules = pidigits
-
-executable = pidigits
-main = pidigits

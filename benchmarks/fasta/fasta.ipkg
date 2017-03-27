@@ -1,6 +1,0 @@
-package fasta
-
-modules = fasta
-
-executable = fasta
-main = fasta

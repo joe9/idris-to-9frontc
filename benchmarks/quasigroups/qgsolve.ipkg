@@ -1,7 +1,0 @@
-package qgsolve
-
-modules = Solver, Parser, Main
-
-executable = qgsolve
-main = Main
-
