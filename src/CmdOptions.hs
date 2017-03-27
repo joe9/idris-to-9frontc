@@ -1,19 +1,15 @@
 {-# LANGUAGE CPP #-}
 {-|
-Module      : Idris.CmdOptions
-Description : A parser for the CmdOptions for the Idris executable.
+Module      : CmdOptions
+Description : A parser for the CmdOptions for the executable.
 License     : BSD3
 Maintainer  : The Idris Community.
 -}
 
 {-# LANGUAGE Arrows #-}
 
-module Idris.CmdOptions
-  (
-    module Idris.CmdOptions
-  , opt
-  , getClient, getPkg, getPkgCheck, getPkgClean, getPkgMkDoc
-  , getPkgREPL, getPkgTest, getPort, getIBCSubDir
+module CmdOptions
+  ( runArgParser
   ) where
 
 import Idris.AbsSyntax (getClient, getIBCSubDir, getPkg, getPkgCheck,

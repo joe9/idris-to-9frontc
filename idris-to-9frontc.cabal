@@ -37,158 +37,14 @@ source-repository head
   type:     git
   location: git://github.com/joe9/idris-to-9frontc.git
 
-Flag FFI
-  Description:  Build support for libffi
-  Default:      False
-  manual:       True
-
-Flag GMP
-  Description:  Use GMP for Integers
-  Default:      False
-  manual:       True
-
--- This flag determines whether to show Git hashes in version strings
--- Defaults to True because Hackage is a source release
-Flag release
-  Description:  This is an official release
-  Default:      False
-  manual:       True
-
-Flag freestanding
-  Description:  Build an Idris that doesn't use cabal
-  Default:      False
-  manual:       True
-
-Flag CI
-  Description:  Built everything using "-Werror", meant for CI-builds only
-  Default:      False
-  manual:       True
-
-Flag execonly
-  Description:  Build executables only, skip the libraries and RTS
-  Default:      False
-  manual:       True
-
 Library
   hs-source-dirs: src
   Exposed-modules:
-                  Idris.Core.Binary
-                , Idris.Core.CaseTree
-                , Idris.Core.Constraints
-                , Idris.Core.DeepSeq
-                , Idris.Core.Elaborate
-                , Idris.Core.Evaluate
-                , Idris.Core.Execute
-                , Idris.Core.ProofState
-                , Idris.Core.ProofTerm
-                , Idris.Core.TT
-                , Idris.Core.Typecheck
-                , Idris.Core.Unify
-                , Idris.Core.WHNF
-
-                , Idris.Elab.Utils
-                , Idris.Elab.Type
-                , Idris.Elab.AsPat
-                , Idris.Elab.Clause
-                , Idris.Elab.Data
-                , Idris.Elab.Record
-                , Idris.Elab.Interface
-                , Idris.Elab.Implementation
-                , Idris.Elab.Provider
-                , Idris.Elab.RunElab
-                , Idris.Elab.Transform
-                , Idris.Elab.Value
-                , Idris.Elab.Term
-                , Idris.Elab.Quasiquote
-                , Idris.Elab.Rewrite
-
-                , Idris.REPL.Browse
-
-                , Idris.AbsSyntax
-                , Idris.AbsSyntaxTree
-                , Idris.Apropos
-                , Idris.ASTUtils
-                , Idris.CaseSplit
-                , Idris.Chaser
-                , Idris.Colours
-                , Idris.Completion
-                , Idris.Coverage
-                , Idris.DSL
-                , Idris.DataOpts
-                , Idris.DeepSeq
-                , Idris.Delaborate
-                , Idris.Directives
-                , Idris.Docs
-                , Idris.Docstrings
-                , Idris.ElabDecls
-                , Idris.Erasure
-                , Idris.Error
-                , Idris.ErrReverse
-                , Idris.Help
-                , Idris.IBC
-                , Idris.IdeMode
-                , Idris.IdrisDoc
-                , Idris.Imports
-                , Idris.Info
-                , Idris.Info.Show
-                , Idris.Inliner
-                , Idris.Interactive
-                , Idris.Output
-                , Idris.Main
-                , Idris.ModeCommon
-                , Idris.Parser
-                , Idris.Parser.Helpers
-                , Idris.Parser.Ops
-                , Idris.Parser.Expr
-                , Idris.Parser.Data
-                , Idris.PartialEval
-                , Idris.Primitives
-                , Idris.ProofSearch
-                , Idris.Prover
-                , Idris.Providers
-                , Idris.Reflection
-                , Idris.REPL
-                , Idris.REPL.Parser
-                , Idris.REPL.Commands
-                , Idris.Termination
-                , Idris.Transforms
-                , Idris.TypeSearch
-                , Idris.Unlit
-                , Idris.WhoCalls
-                , Idris.CmdOptions
-
-                , IRTS.BCImp
-                , IRTS.Bytecode
-                , IRTS.CodegenC
-                , IRTS.CodegenCommon
-                , IRTS.CodegenJavaScript
-                , IRTS.Exports
-                , IRTS.JavaScript.AST
-                , IRTS.Compiler
-                , IRTS.Defunctionalise
-                , IRTS.DumpBC
-                , IRTS.Inliner
-                , IRTS.Lang
-                , IRTS.LangOpts
-                , IRTS.Portable
-                , IRTS.Simplified
-                , IRTS.System
-
-                , Idris.Package
-                , Idris.Package.Common
-
-                , Util.DynamicLinker
-                , Util.ScreenSize
-                , Util.System
+                  CmdOptions
 
   Other-modules:
-                Util.Pretty
-              , Util.Net
-
-              , Idris.Package.Parser
-
                 -- Auto Generated
-              , Paths_idris
+                Paths_idris
               , Version_idris
               , Tools_idris
 
@@ -271,22 +127,10 @@ Library
      build-depends: unix < 2.8
   if os(windows)
      build-depends: Win32 < 2.4
-  if flag(FFI)
-     build-depends: libffi < 0.2
-     cpp-options:   -DIDRIS_FFI
-  if flag(GMP)
-     build-depends: libffi < 0.2
-     extra-libraries: gmp
-     cpp-options:   -DIDRIS_GMP
-  if flag(freestanding)
-     other-modules: Target_idris
-     cpp-options:   -DFREESTANDING
-  if flag(CI)
-     ghc-options:   -Werror
 
 Executable idris-to-9frontc
   Main-is:        Main.hs
-  hs-source-dirs: main
+  hs-source-dirs: app
 
   Build-depends:  idris
                 , base

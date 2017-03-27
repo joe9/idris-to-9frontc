@@ -4,13 +4,7 @@ Description : Main function to decide Idris' mode of use.
 License     : BSD3
 Maintainer  : The Idris Community.
 -}
-module Idris.Main
-  ( idrisMain
-  , idris
-  , runMain
-  , runClient -- taken from Idris.REPL.
-  , loadInputs -- taken from Idris.ModeCommon
-  ) where
+module Main (main) where
 
 import Idris.AbsSyntax
 import Idris.Core.Execute (execute)
@@ -29,6 +23,8 @@ import Idris.REPL.Commands
 import Idris.REPL.Parser
 import IRTS.CodegenCommon
 
+import CmdOptions
+
 import Util.System
 
 import Control.Category
@@ -45,6 +41,19 @@ import System.Exit
 import System.FilePath
 import System.IO
 import Text.Trifecta.Result (ErrInfo(..), Result(..))
+
+-- | The main function for the executable.
+runIdris :: [Opt] -> Idris ()
+runIdris opts = do
+  runIO setupBundledCC
+  idrisMain opts             -- Launch REPL or compile mode.
+
+-- Main program reads command line options, parses the main program, and gets
+-- on with the REPL.
+main :: IO ()
+main = do
+  opts <- runArgParser
+  runMain (runIdris opts)
 
 -- | How to run Idris programs.
 runMain :: Idris () -> IO ()
