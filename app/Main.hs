@@ -7,8 +7,11 @@ Maintainer  : The Idris Community.
 module Main (main) where
 
 import Idris.AbsSyntax
+import Idris.AbsSyntaxTree
+import Idris.Core.Evaluate
 import Idris.Core.Execute (execute)
 import Idris.Core.TT
+import Idris.Delaborate
 import Idris.Elab.Term
 import Idris.Elab.Value
 import Idris.ElabDecls
@@ -42,6 +45,7 @@ import System.Environment (getArgs)
 import System.FilePath
 import System.IO
 import Text.Trifecta.Result (ErrInfo(..), Result(..))
+import Text.PrettyPrint.Annotated.Leijen hiding ((</>))
 
 -- | The main function for the executable.
 -- Main program reads command line options, parses the main program, and gets
@@ -50,8 +54,6 @@ main :: IO ()
 main = do
   args <- getArgs
   putStrLn ("command line arguments: " ++ show args)
---   numCapabilities <- getNumCapabilities
---   putStrLn ("number of cores: " <> show numCapabilities)
   mapM_ (runMain . translateFile) args -- Launch REPL or compile mode.
 
 translateFile :: String -> Idris ()
@@ -60,26 +62,81 @@ translateFile filename =
   -- This isn't a solution - but it's a temporary stopgap.
   -- See issue #2386
   do elabPrims
-     i <- getIState
-     clearErr
+--      orig <- getIState
+--      clearErr
+     let initialState = idrisInit
+     putIState $!! initialState
      mods <- loadInputs [filename] Nothing
      -- Report either success or failure
-     i <- getIState
-     case (errSpan i) of
+     ist <- getIState
+     case (errSpan ist) of
        Nothing -> runIO . putStrLn $ "no errors"
        Just x -> iPrintError $ "didn't load " ++ filename
-     names <- namesInNS []
-     (runIO . putStrLn . show) names
+     underNSs <- namespacesInNS []
+     (runIO . putStrLn . show) underNSs
+--      mapM_ translateNameSpace underNSs
+     mapM_ translateNameSpace [["Main"]]
+--      names <- namesInNS []
+--      names <- namesInNS ["Prelude","Bool"]
+--      (runIO . putStrLn . show) ist
+--      names <- namesInNS ns
+--      if null names
+--         then iPrintError "Invalid or empty namespace"
+--         else do ist <- getIState
+--                 iRenderResult $
+--                   text "Names:" <$>
+--                   indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
+--                                              (group . align $ pprintDelabTy ist n))
+--                                       names))
+     return ()
+
+translateNameSpace :: [String] -> Idris ()
+translateNameSpace ns = do
+     (runIO . putStrLn) ("Namespace is: " ++ show ns)
      names <- namesInNS ns
-     if null names
-        then iPrintError "Invalid or empty namespace"
-        else do ist <- getIState
-                iRenderResult $
-                  text "Names:" <$>
-                  indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
+     (runIO . putStrLn . show) names
+     ist <- getIState
+     iRenderResult $ indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
                                              (group . align $ pprintDelabTy ist n))
                                       names))
-     return ()
+     (runIO . putStrLn . show) (map (\n -> (n, lookupTyName n (tt_ctxt ist))) names)
+--      (runIO . putStrLn . show) (map (\n -> (n, lookupTy n (tt_ctxt ist))) names)
+--      (runIO . putStrLn . show)
+--        (map (\n -> (n, lookupCtxt n ((definitions . tt_ctxt) ist))) names)
+     mapM_ translateNamedObject names
+
+translateNamedObject :: Name -> Idris ()
+translateNamedObject name = do
+     ist <- getIState
+     (runIO . putStrLn . show) name
+     mapM_ (translateTTDecl name) (lookupCtxt name ((definitions . tt_ctxt) ist))
+
+-- defined in Core/Evaluate.hs
+-- type TTDecl = (Def, RigCount, Injectivity, Accessibility, Totality, MetaInformation)
+-- Hidden => Programs can't access the name at all
+-- Public => Programs can access the name and use at will
+-- Frozen => Programs can access the name, which doesn't reduce
+-- Private => Programs can't access the name, doesn't reduce internally
+-- data Accessibility = Hidden | Public | Frozen | Private
+translateTTDecl :: Name -> TTDecl -> Idris ()
+translateTTDecl _ (def, _, _, accessibility, _, _) = translateDef def
+
+translateDef :: Def -> Idris ()
+translateDef (Function ty tm) = (runIO . putStrLn) $ "Function: " ++ show (ty, tm)
+translateDef (TyDecl nt ty) = (runIO . putStrLn) $ "TyDecl: " ++ show nt ++ " " ++ show ty
+translateDef (Operator ty _ _) = (runIO . putStrLn) $ "Operator: " ++ show ty
+translateDef (CaseOp (CaseInfo inlc inla inlr) ty atys ps_in ps cd)
+      = let (ns, sc) = cases_compiletime cd
+            (ns', sc') = cases_runtime cd in
+          (runIO . putStrLn) $
+            "Case: " ++ show ty ++ " " ++ show ps ++ "\n" ++
+                                            "COMPILE TIME:\n\n" ++
+                                            show ns ++ " " ++ show sc ++ "\n\n" ++
+                                            "RUN TIME:\n\n" ++
+                                            show ns' ++ " " ++ show sc' ++ "\n\n" ++
+                if inlc then "Inlinable" else "Not inlinable" ++
+                if inla then " Aggressively\n" else "\n"
+
 
 -- | The main function of Idris that when given a set of Options will
 -- launch Idris into the desired interaction mode either: REPL;
