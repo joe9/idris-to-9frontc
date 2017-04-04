@@ -167,6 +167,7 @@ Executable idris-to-9frontc
                 , fsnotify >= 0.2 && < 2.2
                 , async < 2.2
                 , groom
+                , language-c
 
   ghc-prof-options: -auto-all -caf-all
   ghc-options:      -threaded -rtsopts -funbox-strict-fields

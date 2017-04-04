@@ -4,119 +4,374 @@ Description : Main function to decide Idris' mode of use.
 License     : BSD3
 Maintainer  : The Idris Community.
 -}
-module Main (main) where
+module Main
+  (main)
+  where
 
 import Idris.AbsSyntax
-import Idris.AbsSyntaxTree
 import Idris.Core.CaseTree
 import Idris.Core.Evaluate
-import Idris.Core.Execute (execute)
 import Idris.Core.TT
 import Idris.Delaborate
-import Idris.Elab.Term
-import Idris.Elab.Value
 import Idris.ElabDecls
-import Idris.Error
-import Idris.IBC
-import Idris.Info
 import Idris.Main (runMain)
 import Idris.ModeCommon
 import Idris.Output
-import Idris.Parser hiding (indent)
-import Idris.REPL
-import Idris.REPL.Commands
-import Idris.REPL.Parser
 import Idris.REPL.Browse
-import IRTS.CodegenCommon
-
-import Util.System
-
+--
 import Control.Category
 import Control.DeepSeq
 import Control.Monad
-import Control.Monad.Trans (lift)
-import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.State.Strict (execStateT)
 import Data.Maybe
+import Language.C hiding (Name)
+-- import Language.C.Data.Ident
+import Language.C.Syntax.AST
+import Language.C.System.GCC
 import Prelude hiding (id, (.), (<$>))
-import System.Console.Haskeline as H
-import System.Directory
-import System.Exit
 import System.Environment (getArgs)
-import System.FilePath
-import System.IO
-import Text.Trifecta.Result (ErrInfo(..), Result(..))
 import Text.PrettyPrint.Annotated.Leijen hiding ((</>))
 
 -- | The main function for the executable.
 -- Main program reads command line options, parses the main program, and gets
 -- on with the REPL.
-main :: IO ()
+main
+    :: IO ()
 main = do
-  args <- getArgs
-  putStrLn ("command line arguments: " ++ show args)
-  mapM_ (runMain . translateFile) args -- Launch REPL or compile mode.
+    args <- getArgs
+    putStrLn ("command line arguments: " ++ show args)
+    mapM_ (runMain . translateFile) args -- Launch REPL or compile mode.
+    ast <- loadAst
+    -- pretty print
+    printMyAST
+        ast
+    printMyAST testAst
+
+-- testAst = CTranslUnit [CDeclExt (CDecl [ ] [(Nothing, Nothing, Nothing)] undefNode) ] undefNode
+testAst
+    :: CTranslationUnit NodeInfo
+testAst =
+    CTranslUnit
+        [(enum "Distancetype" ["Mile", "Kilometre", "Lightyear"])]
+        undefNode
+
+enum :: String -> [String] -> CExternalDeclaration NodeInfo
+enum name elements =
+    CDeclExt
+        (CDecl
+             [ CStorageSpec (CTypedef undefNode)
+             , CTypeSpec
+                   (CEnumType
+                        (CEnum
+                             Nothing
+                             (Just
+                                  (map
+                                       (\e ->
+                                             (internalIdent e, Nothing))
+                                       elements))
+                             []
+                             undefNode)
+                        undefNode)]
+             [ ( Just
+                     (CDeclr
+                          (Just (internalIdent name))
+                          []
+                          Nothing
+                          []
+                          undefNode)
+               , Nothing
+               , Nothing)]
+             undefNode)
+
+emptyTypedefStruct :: String -> CExternalDeclaration NodeInfo
+emptyTypedefStruct name =
+    CDeclExt
+       (CDecl
+          [CStorageSpec
+             (CTypedef
+                undefNode)
+          ,CTypeSpec
+             (CSUType
+                (CStruct
+                   CStructTag
+                   (Just
+                      (internalIdent
+                         name))
+                   Nothing
+                   []
+                   undefNode)
+                undefNode)]
+          [(Just
+              (CDeclr
+                 (Just
+                    (internalIdent
+                       name))
+                 []
+                 Nothing
+                 []
+                 undefNode)
+           ,Nothing
+           ,Nothing)]
+          undefNode)
+
+dataConstructors =
+  CTranslUnit
+    [(enum "Distancetype" ["Angstrom", "Mile", "Kilometre", "Lightyear"])
+    -- typedef struct Distance Distance;
+    ,emptyTypedefStruct "Distance"
+    ,CDeclExt
+       (CDecl
+          [CStorageSpec
+             (CTypedef
+                undefNode)
+          ,CTypeSpec
+             (CSUType
+                (CStruct
+                   CStructTag
+                   (Just
+                      (internalIdent
+                         "Distance"))
+                   (Just
+                      [CDecl
+                         [CTypeSpec
+                            (CTypeDef
+                               (internalIdent
+                                  "Distancetype")
+                               undefNode)]
+                         [(Just
+                             (CDeclr
+                                (Just
+                                   (internalIdent
+                                      "tag"))
+                                []
+                                Nothing
+                                []
+                                undefNode)
+                          ,Nothing
+                          ,Nothing)]
+                         undefNode
+                      ,CDecl
+                         [CTypeSpec
+                            (CSUType
+                               (CStruct
+                                  CUnionTag
+                                  Nothing
+                                  (Just
+                                     [CDecl
+                                        [CTypeSpec
+                                           (CDoubleType
+                                              undefNode)]
+                                        [(Just
+                                            (CDeclr
+                                               (Just
+                                                  (internalIdent
+                                                     "angstorms"))
+                                               []
+                                               Nothing
+                                               []
+                                               undefNode)
+                                         ,Nothing
+                                         ,Nothing)]
+                                        undefNode
+                                     ,CDecl
+                                        [CTypeSpec
+                                           (CDoubleType
+                                              undefNode)]
+                                        [(Just
+                                            (CDeclr
+                                               (Just
+                                                  (internalIdent
+                                                     "miles"))
+                                               []
+                                               Nothing
+                                               []
+                                               undefNode)
+                                         ,Nothing
+                                         ,Nothing)]
+                                        undefNode
+                                     ,CDecl
+                                        [CTypeSpec
+                                           (CDoubleType
+                                              undefNode)]
+                                        [(Just
+                                            (CDeclr
+                                               (Just
+                                                  (internalIdent
+                                                     "kilometres"))
+                                               []
+                                               Nothing
+                                               []
+                                               undefNode)
+                                         ,Nothing
+                                         ,Nothing)]
+                                        undefNode
+                                     ,CDecl
+                                        [CTypeSpec
+                                           (CSUType
+                                              (CStruct
+                                                 CStructTag
+                                                 Nothing
+                                                 (Just
+                                                    [CDecl
+                                                       [CTypeSpec
+                                                          (CDoubleType
+                                                             undefNode)]
+                                                       [(Just
+                                                           (CDeclr
+                                                              (Just
+                                                                 (internalIdent
+                                                                    "x"))
+                                                              []
+                                                              Nothing
+                                                              []
+                                                              undefNode)
+                                                        ,Nothing
+                                                        ,Nothing)]
+                                                       undefNode
+                                                    ,CDecl
+                                                       [CTypeSpec
+                                                          (CDoubleType
+                                                             undefNode)]
+                                                       [(Just
+                                                           (CDeclr
+                                                              (Just
+                                                                 (internalIdent
+                                                                    "y"))
+                                                              []
+                                                              Nothing
+                                                              []
+                                                              undefNode)
+                                                        ,Nothing
+                                                        ,Nothing)]
+                                                       undefNode])
+                                                 []
+                                                 undefNode)
+                                              undefNode)]
+                                        [(Just
+                                            (CDeclr
+                                               (Just
+                                                  (internalIdent
+                                                     "lightyear"))
+                                               []
+                                               Nothing
+                                               []
+                                               undefNode)
+                                         ,Nothing
+                                         ,Nothing)]
+                                        undefNode])
+                                  []
+                                  undefNode)
+                               undefNode)]
+                         []
+                         undefNode])
+                   []
+                   undefNode)
+                undefNode)]
+          []
+          undefNode)]
+    undefNode
+
+loadAst =
+    errorOnLeftM "Parse Error" $
+    parseCFile (newGCC "gcc") Nothing [] "example.c"
+
+errorOnLeft
+    :: (Show a)
+    => String -> (Either a b) -> IO b
+errorOnLeft msg = either (error . ((msg ++ ": ") ++) . show) return
+
+errorOnLeftM
+    :: (Show a)
+    => String -> IO (Either a b) -> IO b
+errorOnLeftM msg action = action >>= errorOnLeft msg
+
+printMyAST :: CTranslUnit -> IO ()
+printMyAST ctu = (print . pretty) ctu
 
 translateFile :: String -> Idris ()
-translateFile filename =
-  -- The $!! here prevents a space leak on reloading.
-  -- This isn't a solution - but it's a temporary stopgap.
-  -- See issue #2386
-  do elabPrims
---      orig <- getIState
---      clearErr
-     let initialState = idrisInit
-     putIState $!! initialState
-     mods <- loadInputs [filename] Nothing
-     -- Report either success or failure
-     ist <- getIState
-     case (errSpan ist) of
-       Nothing -> runIO . putStrLn $ "no errors"
-       Just x -> iPrintError $ "didn't load " ++ filename
-     underNSs <- namespacesInNS []
-     (runIO . putStrLn . show) underNSs
---      mapM_ translateNameSpace underNSs
-     translateMain
---      names <- namesInNS []
---      names <- namesInNS ["Prelude","Bool"]
---      (runIO . putStrLn . show) ist
---      names <- namesInNS ns
---      if null names
---         then iPrintError "Invalid or empty namespace"
---         else do ist <- getIState
---                 iRenderResult $
---                   text "Names:" <$>
---                   indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
---                                              (group . align $ pprintDelabTy ist n))
---                                       names))
-     return ()
+translateFile filename = do
+    elabPrims
+    --      orig <- getIState
+    --      clearErr
+    let initialState = idrisInit
+    putIState $!! initialState
+    mods <- loadInputs [filename] Nothing
+    (runIO . putStrLn . show) mods
+    -- Report either success or failure
+    ist <- getIState
+    case (errSpan ist) of
+        Nothing -> runIO . putStrLn $ "no errors"
+        Just x ->
+            iPrintError $ "didn't load " ++ filename ++ ", error: " ++ show x
+    underNSs <- namespacesInNS []
+    (runIO . putStrLn . show) underNSs
+    --      mapM_ translateNameSpace underNSs
+    translateMain
+    --      names <- namesInNS []
+    --      names <- namesInNS ["Prelude","Bool"]
+    --      (runIO . putStrLn . show) ist
+    --      names <- namesInNS ns
+    --      if null names
+    --         then iPrintError "Invalid or empty namespace"
+    --         else do ist <- getIState
+    --                 iRenderResult $
+    --                   text "Names:" <$>
+    --                   indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
+    --                                              (group . align $ pprintDelabTy ist n))
+    --                                       names))
+    return
+        ()
 
 translateMain :: Idris ()
 translateMain = do
-  namesInMain <- namesInNS ["Main"]
---   mapM_ translateNamedObject namesInMain
-  (mapM_ translateNamedObject . filter ((==) "Main.main" . show)) namesInMain
+    namesInMain <- namesInNS ["Main"]
+    --   mapM_ translateNamedObject namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.main" . show))
+        namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.MkPerson" . show))
+        namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.MyNil" . show))
+        namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.Distance" . show))
+        namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.Mile" . show))
+        namesInMain
+    (mapM_ translateNamedObject . filter ((==) "Main.Person" . show))
+        namesInMain
 
 translateNameSpace :: [String] -> Idris ()
 translateNameSpace ns = do
-     (runIO . putStrLn) ("Namespace is: " ++ show ns)
-     names <- namesInNS ns
-     (runIO . putStrLn . show) names
-     ist <- getIState
-     iRenderResult $ indent 2 (vsep (map (\n -> prettyName True False [] n <+> colon <+>
-                                             (group . align $ pprintDelabTy ist n))
-                                      names))
-     (runIO . putStrLn . show) (map (\n -> (n, lookupTyName n (tt_ctxt ist))) names)
---      (runIO . putStrLn . show) (map (\n -> (n, lookupTy n (tt_ctxt ist))) names)
---      (runIO . putStrLn . show)
---        (map (\n -> (n, lookupCtxt n ((definitions . tt_ctxt) ist))) names)
-     mapM_ translateNamedObject names
+    (runIO . putStrLn) ("Namespace is: " ++ show ns)
+    names <- namesInNS ns
+    (runIO . putStrLn . show) names
+    ist <- getIState
+    iRenderResult $
+        indent
+            2
+            (vsep
+                 (map
+                      (\n ->
+                            prettyName True False [] n <+>
+                            colon <+> (group . align $ pprintDelabTy ist n))
+                      names))
+    (runIO . putStrLn . show)
+        (map
+             (\n ->
+                   (n, lookupTyName n (tt_ctxt ist)))
+             names)
+    --      (runIO . putStrLn . show) (map (\n -> (n, lookupTy n (tt_ctxt ist))) names)
+    --      (runIO . putStrLn . show)
+    --        (map (\n -> (n, lookupCtxt n ((definitions . tt_ctxt) ist))) names)
+    mapM_
+        translateNamedObject
+        names
 
 translateNamedObject :: Name -> Idris ()
 translateNamedObject name = do
-     ist <- getIState
-     (runIO . putStrLn . show) name
-     mapM_ (translateTTDecl name) (lookupCtxt name ((definitions . tt_ctxt) ist))
+    ist <- getIState
+    (runIO . putStrLn . show) name
+    mapM_
+        (translateTTDecl name)
+        (lookupCtxt name ((definitions . tt_ctxt) ist))
 
 -- defined in Core/Evaluate.hs
 -- type TTDecl = (Def, RigCount, Injectivity, Accessibility, Totality, MetaInformation)
