@@ -8,6 +8,7 @@ module Main (main) where
 
 import Idris.AbsSyntax
 import Idris.AbsSyntaxTree
+import Idris.Core.CaseTree
 import Idris.Core.Evaluate
 import Idris.Core.Execute (execute)
 import Idris.Core.TT
@@ -75,7 +76,7 @@ translateFile filename =
      underNSs <- namespacesInNS []
      (runIO . putStrLn . show) underNSs
 --      mapM_ translateNameSpace underNSs
-     mapM_ translateNameSpace [["Main"]]
+     translateMain
 --      names <- namesInNS []
 --      names <- namesInNS ["Prelude","Bool"]
 --      (runIO . putStrLn . show) ist
@@ -89,6 +90,12 @@ translateFile filename =
 --                                              (group . align $ pprintDelabTy ist n))
 --                                       names))
      return ()
+
+translateMain :: Idris ()
+translateMain = do
+  namesInMain <- namesInNS ["Main"]
+--   mapM_ translateNamedObject namesInMain
+  (mapM_ translateNamedObject . filter ((==) "Main.main" . show)) namesInMain
 
 translateNameSpace :: [String] -> Idris ()
 translateNameSpace ns = do
@@ -125,18 +132,75 @@ translateDef :: Def -> Idris ()
 translateDef (Function ty tm) = (runIO . putStrLn) $ "Function: " ++ show (ty, tm)
 translateDef (TyDecl nt ty) = (runIO . putStrLn) $ "TyDecl: " ++ show nt ++ " " ++ show ty
 translateDef (Operator ty _ _) = (runIO . putStrLn) $ "Operator: " ++ show ty
-translateDef (CaseOp (CaseInfo inlc inla inlr) ty atys ps_in ps cd)
-      = let (ns, sc) = cases_compiletime cd
-            (ns', sc') = cases_runtime cd in
+translateDef (CaseOp _ returnType argumentTypes originalDefinition simplifiedDefinition caseDefs)
+      = let (ns, sc) = cases_runtime caseDefs in do
           (runIO . putStrLn) $
-            "Case: " ++ show ty ++ " " ++ show ps ++ "\n" ++
-                                            "COMPILE TIME:\n\n" ++
-                                            show ns ++ " " ++ show sc ++ "\n\n" ++
-                                            "RUN TIME:\n\n" ++
-                                            show ns' ++ " " ++ show sc' ++ "\n\n" ++
-                if inlc then "Inlinable" else "Not inlinable" ++
-                if inla then " Aggressively\n" else "\n"
+            "Case: returnType=" ++ show returnType ++ "\n"
+                           ++ " argumentTypes=" ++ show argumentTypes ++ "\n"
+                           ++ " originalDefinition=" ++ show originalDefinition ++ "\n"
+                           ++ " simplifiedDefinition=" ++ show simplifiedDefinition ++ "\n"
+                           ++ "names=" ++ show ns ++ " SC=" ++ show sc ++ "\n\n"
+          (runIO . putStrLn) "Translating SC"
+          translateSC sc
 
+translateSC :: SC -> Idris ()
+translateSC (Case _ name alts) = do
+  (runIO . putStrLn) $ "case " ++ show name ++ " of\n"
+  mapM_ translateCaseAlt alts
+translateSC (ProjCase tm alts) = do
+  (runIO . putStrLn) $ "case " ++ show tm ++ " of\n"
+  mapM_ translateCaseAlt alts
+translateSC (STerm tm) = do
+  (runIO . putStrLn) "STerm"
+  translateTerm tm
+translateSC (UnmatchedCase str) = (runIO . putStrLn) $ "error " ++ show str
+translateSC ImpossibleCase = (runIO . putStrLn) $ "impossible"
+
+translateCaseAlt :: CaseAlt -> Idris ()
+translateCaseAlt (ConCase n _ args sc) = do
+  (runIO . putStrLn) $ show n ++ "(" ++ showSep (", ") (map show args)
+  translateSC sc
+traslateCaseAlt (FnCase n args sc) = do
+  (runIO . putStrLn) $ "FN " ++ show n ++ "(" ++ showSep (", ") (map show args)
+  translateSC sc
+traslateCaseAlt (ConstCase t sc) = do
+  (runIO . putStrLn) $ "ConstCase " ++ show t
+  translateSC sc
+traslateCaseAlt (SucCase n sc) = do
+  (runIO . putStrLn) $ "SucCase " ++ show n
+  translateSC sc
+traslateCaseAlt (DefaultCase sc) = do
+  (runIO . putStrLn) "DefaultCase "
+  translateSC sc
+
+translateTerm :: Term -> Idris ()
+translateTerm (P nt n t) =
+  (runIO . putStrLn) $ "P: " ++ show nt ++ ", name: " ++ show n ++ ", term: " ++ show t
+translateTerm (V i) = (runIO . putStrLn) $ "V " ++ show i
+translateTerm (Bind n b t) = do
+  (runIO . putStrLn) $ "Bind " ++ show n ++ " " ++ show b ++ " " ++ show t
+  translateBinder b
+  translateTerm t
+translateTerm (App _ f a) = do
+  (runIO . putStrLn) $ "App: functionType: " ++ show f ++ ", argument: " ++ show a
+  translateTerm f
+  translateTerm a
+translateTerm (Proj t i) = do
+  (runIO . putStrLn) $ "Proj " ++ show t ++ " " ++ show i
+  translateTerm t
+translateTerm (Constant c) = (runIO . putStrLn) $ "Constant " ++ show c
+translateTerm Erased = (runIO . putStrLn) "Erased"
+translateTerm Impossible = (runIO . putStrLn) "Impossible"
+translateTerm (Inferred t) = do
+  (runIO . putStrLn) "Inferred "
+  translateTerm t
+translateTerm (TType i) = do
+  (runIO . putStrLn) $ "TType " ++ show i
+translateTerm (UType u) = do
+  (runIO . putStrLn) $ "UType " ++ show u
+
+translateBinder :: Binder Term -> Idris ()
+translateBinder b = (runIO . putStrLn) $ show b
 
 -- | The main function of Idris that when given a set of Options will
 -- launch Idris into the desired interaction mode either: REPL;
