@@ -1,6 +1,0 @@
-package test_functions
-
-opts = "--quiet"
-
-modules = TestFunctions
-

@@ -1,9 +1,0 @@
-:type ++
-:core (/) {a=Double}
-:doc +
-:wc +
-:printdef -
-:patt /
-/
-++
-:whnf /

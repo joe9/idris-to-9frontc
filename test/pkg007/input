@@ -1,4 +1,0 @@
-:module Toy
-:module Toy.Vehicle
-:module Toy.Vehicle.Car
-(toysAreGreat, carNoise, Pedal)

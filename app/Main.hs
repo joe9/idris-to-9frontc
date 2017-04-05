@@ -527,20 +527,38 @@ translateFile filename = do
 
 translateMain :: Idris ()
 translateMain = do
-    namesInMain <- namesInNS ["Main"]
-    --   mapM_ translateNamedObject namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.main" . show))
+  namesInMain <- namesInNS ["Main"]
+  --   mapM_ translateNamedObject namesInMain
+  (mapM_ translateNamedObject . filter ((==) "Main.main" . show))
+       namesInMain
+  (mapM_ translateNamedObject . filter ((==) "Main.MkPerson" . show))
+       namesInMain
+  (mapM_ translateNamedObject . filter ((==) "Main.MyNil" . show))
+       namesInMain
+  (mapM_ translateNamedObject . filter ((==) "Main.Distance" . show))
         namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.MkPerson" . show))
+  (mapM_ translateNamedObject . filter ((==) "Main.Mile" . show))
         namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.MyNil" . show))
+  (mapM_ translateNamedObject . filter ((==) "Main.Person" . show))
         namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.Distance" . show))
+  (mapM_ translateDataType . filter ((==) "Main.Distance" . show))
         namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.Mile" . show))
+  (mapM_ translateDataType . filter ((==) "Main.Pair" . show))
         namesInMain
-    (mapM_ translateNamedObject . filter ((==) "Main.Person" . show))
-        namesInMain
+
+translateDataType n = do
+  i <- getIState
+--   jri <- lookupCtxtExact n (idris_records i)
+--   maybe "" ( ) jri
+  let jti = lookupCtxtExact n (idris_datatypes i)
+  (runIO . putStrLn) $ maybe "" (show . con_names) jti
+
+translateData n = do
+  i <- getIState
+--   jri <- lookupCtxtExact n (idris_records i)
+--   maybe "" ( ) jri
+  let jti = lookupCtxtExact n (idris_datatypes i)
+  (runIO . putStrLn) $ maybe "" (show . con_names) jti
 
 translateNameSpace :: [String] -> Idris ()
 translateNameSpace ns = do

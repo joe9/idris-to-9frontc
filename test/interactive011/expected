@@ -1,3 +1,0 @@
-    show x = ?Show_rhs_1
-    showPrec d x = ?Show_rhs_2
-append [] _ = ?append_rhs_1

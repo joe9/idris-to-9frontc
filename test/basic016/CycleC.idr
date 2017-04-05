@@ -1,4 +1,0 @@
-module CycleC
-
-import CycleA
-

@@ -1,5 +1,0 @@
-package base001
-
-executable = base001
-main = base001
-makefile = Makefile
