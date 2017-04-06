@@ -13,6 +13,7 @@ import Idris.Core.CaseTree
 import Idris.Core.Evaluate
 import Idris.Core.TT
 import Idris.Delaborate
+import Idris.Docs
 import Idris.ElabDecls
 import Idris.Main (runMain)
 import Idris.ModeCommon
@@ -553,9 +554,9 @@ toCProgram :: [CExternalDeclaration NodeInfo] -> CTranslationUnit NodeInfo
 toCProgram decls = CTranslUnit decls undefNode
 
 translateCalleeToC :: Callee -> Idris ([CExternalDeclaration NodeInfo])
-translateCalleeToC c = fmap (translateCalleeToCS c) getIState
+translateCalleeToC c = getIState >>= translateCalleeToCS c
 
-translateCalleeToCS :: Callee -> IState -> [CExternalDeclaration NodeInfo]
+translateCalleeToCS :: Callee -> IState -> Idris [CExternalDeclaration NodeInfo]
 translateCalleeToCS c@(Callee name _ _) istate
   | isRecord name istate =
     translateCalleeRecordToC c istate (lookupCtxtExact name (idris_records istate))
@@ -567,20 +568,23 @@ translateCalleeToCS c@(Callee name _ _) istate
 
 isRecord :: Name -> IState -> Bool
 isRecord name = isJust . lookupCtxtExact name . idris_records
+
 isData :: Name -> IState -> Bool
 isData name = isJust . lookupCtxtExact name . idris_datatypes
 
-translateCalleeRecordToC :: Callee -> IState -> Maybe RecordInfo -> [CExternalDeclaration NodeInfo]
-translateCalleeRecordToC _ _ Nothing = []
-translateCalleeRecordToC (Callee name returnType arguments) istate (Just record) = []
+translateCalleeRecordToC :: Callee -> IState -> Maybe RecordInfo -> Idris [CExternalDeclaration NodeInfo]
+translateCalleeRecordToC _ _ Nothing = return []
+translateCalleeRecordToC (Callee name returnType arguments) istate (Just record) = return []
 
-translateCalleeDataToC :: Callee -> IState -> Maybe TypeInfo -> [CExternalDeclaration NodeInfo]
-translateCalleeDataToC _ _ Nothing = []
-translateCalleeDataToC (Callee name returnType arguments) istate (Just dataInfo) = []
+translateCalleeDataToC :: Callee -> IState -> Maybe TypeInfo -> Idris [CExternalDeclaration NodeInfo]
+translateCalleeDataToC _ _ Nothing = return []
+translateCalleeDataToC (Callee name returnType arguments) istate (Just dataInfo) = return []
 
-translateCalleeFunctionToC :: Callee -> IState -> Maybe TTDecl -> [CExternalDeclaration NodeInfo]
-translateCalleeFunctionToC _ _ Nothing = []
-translateCalleeFunctionToC (Callee name returnType arguments) istate (Just (def,_,_,_,_,_)) = []
+translateCalleeFunctionToC :: Callee -> IState -> Maybe TTDecl -> Idris [CExternalDeclaration NodeInfo]
+translateCalleeFunctionToC _ _ Nothing = return []
+translateCalleeFunctionToC (Callee name returnType arguments) istate (Just (def,_,_,_,_,_)) = do
+  docs <- getDocs name FullDocs
+  return []
 
 mainCalls :: Idris [Callee]
 mainCalls = do
