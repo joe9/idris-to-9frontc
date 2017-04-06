@@ -504,7 +504,6 @@ data Callee = Callee
   , cReturnType :: Type
   -- Idris/Core/TT.hs:type Term = TT Name
   , cArguments :: [Term]
-  , cBuiltCallees :: Bool
   } deriving (Eq, Show)
 
 translateFile :: String -> Idris ()
@@ -554,13 +553,40 @@ toCProgram :: [CExternalDeclaration NodeInfo] -> CTranslationUnit NodeInfo
 toCProgram decls = CTranslUnit decls undefNode
 
 translateCalleeToC :: Callee -> Idris ([CExternalDeclaration NodeInfo])
-translateCalleeToC (Callee name returnType arguments _) = return []
+translateCalleeToC c = fmap (translateCalleeToCS c) getIState
+
+translateCalleeToCS :: Callee -> IState -> [CExternalDeclaration NodeInfo]
+translateCalleeToCS c@(Callee name _ _) istate
+  | isRecord name istate =
+    translateCalleeRecordToC c istate (lookupCtxtExact name (idris_records istate))
+  | isData name istate =
+    translateCalleeDataToC c istate (lookupCtxtExact name (idris_datatypes istate))
+  | otherwise =
+    translateCalleeFunctionToC c istate
+      ((lookupCtxtExact name . definitions . tt_ctxt) istate)
+
+isRecord :: Name -> IState -> Bool
+isRecord name = isJust . lookupCtxtExact name . idris_records
+isData :: Name -> IState -> Bool
+isData name = isJust . lookupCtxtExact name . idris_datatypes
+
+translateCalleeRecordToC :: Callee -> IState -> Maybe RecordInfo -> [CExternalDeclaration NodeInfo]
+translateCalleeRecordToC _ _ Nothing = []
+translateCalleeRecordToC (Callee name returnType arguments) istate (Just record) = []
+
+translateCalleeDataToC :: Callee -> IState -> Maybe TypeInfo -> [CExternalDeclaration NodeInfo]
+translateCalleeDataToC _ _ Nothing = []
+translateCalleeDataToC (Callee name returnType arguments) istate (Just dataInfo) = []
+
+translateCalleeFunctionToC :: Callee -> IState -> Maybe TTDecl -> [CExternalDeclaration NodeInfo]
+translateCalleeFunctionToC _ _ Nothing = []
+translateCalleeFunctionToC (Callee name returnType arguments) istate (Just (def,_,_,_,_,_)) = []
 
 mainCalls :: Idris [Callee]
 mainCalls = do
   ist <- getIState
   calls <- (calleesOf . lookupTyNameExact (sNS (sUN "main") ["Main"]) . tt_ctxt) ist
-  return calls
+  return (removeDuplicates calls)
 
 calleesOf :: Maybe (Name, Type) -> Idris [Callee]
 calleesOf Nothing = return []
@@ -571,7 +597,7 @@ calleesOf (Just (name,returnType)) = do
 --               (lookupCtxt name ((definitions . tt_ctxt) ist))
   callees <- calleesFromTTDecl
               (lookupCtxtExact name ((definitions . tt_ctxt) ist))
-  return ([Callee name returnType [] True] ++ callees)
+  return ([Callee name returnType []] ++ callees)
 
 -- defined in Core/Evaluate.hs
 -- type TTDecl = (Def, RigCount, Injectivity, Accessibility, Totality, MetaInformation)
@@ -592,7 +618,7 @@ calleesFromDef (CaseOp _ returnType _ _ _ caseDefs) = do
 toCallee :: Name -> Idris (Maybe Callee)
 toCallee name =
   getIState >>=
-  (return . fmap (\(n,t) -> Callee n t [] False) . lookupTyNameExact name . tt_ctxt)
+  (return . fmap (\(n,t) -> Callee n t []) . lookupTyNameExact name . tt_ctxt)
 
 -- Idris/Core/TT.hs:type Term = TT Name
 calleeFromTerm :: Term -> Idris (Maybe Callee)
@@ -630,7 +656,7 @@ calleesFromTerm (App _ f a) = do
   let uMaybeCallee = fmap (\c -> c{cArguments = cArguments c ++ [a]}) maybeCallee
   argCallees <- calleesFromArguments uMaybeCallee
   return (maybe [] (\c -> c : argCallees) uMaybeCallee)
-calleesFromTerm c@(Constant _) = return ([Callee (sUN "Constant") c [] True])
+calleesFromTerm c@(Constant _) = return ([Callee (sUN "Constant") c []])
 calleesFromTerm t = error ( "CalleesFromTerm not defined: " ++ show t)
 -- calleesFromTerm (Proj t i) = error "CalleesFromTerm Proj not defined"
 -- calleesFromTerm Erased = return []
@@ -828,3 +854,10 @@ translateBinder b = (runIO . putStrLn) $ show b
 
 outputAST :: CTranslUnit -> Idris ()
 outputAST ctu = (runIO . writeFile "output.c" . render . pretty) ctu
+
+removeDuplicates :: Eq a => [a] -> [a]
+removeDuplicates = rdHelper []
+    where rdHelper seen [] = seen
+          rdHelper seen (x:xs)
+              | x `elem` seen = rdHelper seen xs
+              | otherwise = rdHelper (seen ++ [x]) xs
