@@ -574,16 +574,23 @@ isData name = isJust . lookupCtxtExact name . idris_datatypes
 
 translateCalleeRecordToC :: Callee -> IState -> Maybe RecordInfo -> Idris [CExternalDeclaration NodeInfo]
 translateCalleeRecordToC _ _ Nothing = return []
-translateCalleeRecordToC (Callee name returnType arguments) istate (Just record) = return []
+translateCalleeRecordToC (Callee name returnType arguments) istate (Just record) = do
+  (runIO . putStrLn . show) record
+  return []
 
 translateCalleeDataToC :: Callee -> IState -> Maybe TypeInfo -> Idris [CExternalDeclaration NodeInfo]
 translateCalleeDataToC _ _ Nothing = return []
-translateCalleeDataToC (Callee name returnType arguments) istate (Just dataInfo) = return []
+translateCalleeDataToC (Callee name returnType arguments) istate (Just dataInfo) = do
+  (runIO . putStrLn . show) dataInfo
+  return []
 
 translateCalleeFunctionToC :: Callee -> IState -> Maybe TTDecl -> Idris [CExternalDeclaration NodeInfo]
 translateCalleeFunctionToC _ _ Nothing = return []
-translateCalleeFunctionToC (Callee name returnType arguments) istate (Just (def,_,_,_,_,_)) = do
+translateCalleeFunctionToC c@(Callee name returnType arguments) istate (Just (def,_,_,_,_,_)) = do
   docs <- getDocs name FullDocs
+  (runIO . putStrLn . show) c
+  (runIO . putStrLn . show) def
+--   (runIO . putStrLn . show) docs
   return []
 
 mainCalls :: Idris [Callee]
@@ -625,61 +632,55 @@ toCallee name =
   (return . fmap (\(n,t) -> Callee n t []) . lookupTyNameExact name . tt_ctxt)
 
 -- Idris/Core/TT.hs:type Term = TT Name
-calleeFromTerm :: Term -> Idris (Maybe Callee)
--- can only get the name from the P constructor
--- as the type is erased in the P data constructor
-calleeFromTerm (P _ n _) = toCallee n
-calleeFromTerm (V i) = error "CalleeFromTerm V not defined"
-calleeFromTerm (Bind n b t) = error "CalleeFromTerm Bind not defined"
-calleeFromTerm (App _ f a) = do
-  maybeCallee <- calleeFromTerm f
-  return (fmap (\c -> c{cArguments = cArguments c ++ [a]}) maybeCallee)
--- calleesFromTerm (Proj t i) = error "CalleesFromTerm Proj not defined"
--- calleesFromTerm (Constant c) = calleesFromConstant c
--- calleesFromTerm Erased = return []
--- calleesFromTerm Impossible = return []
--- calleesFromTerm (Inferred t) = do
---     (runIO . putStrLn) "Inferred "
---     translateTerm t
--- calleesFromTerm (TType i) = do
---     (runIO . putStrLn) $ "TType " ++ show i
--- calleesFromTerm (UType u) = do
---     (runIO . putStrLn) $ "UType " ++ show u
-calleeFromTerm _ = error "CalleeFromTerm not defined"
-
--- Idris/Core/TT.hs:type Term = TT Name
 calleesFromTerm :: Term -> Idris [Callee]
 -- can only get the name from the P constructor
 -- as the type is erased in the P data constructor
-calleesFromTerm p@(P _ n _) = do
-  calleeFromTerm p >>= return . maybe [] (\c -> [c])
-calleesFromTerm (V i) = error "CalleesFromTerm V not defined"
-calleesFromTerm (Bind n b t) = error "CalleesFromTerm Bind not defined"
-calleesFromTerm (App _ f a) = do
-  maybeCallee <- calleeFromTerm f
-  let uMaybeCallee = fmap (\c -> c{cArguments = cArguments c ++ [a]}) maybeCallee
-  argCallees <- calleesFromArguments uMaybeCallee
-  return (maybe [] (\c -> c : argCallees) uMaybeCallee)
-calleesFromTerm c@(Constant _) = return ([Callee (sUN "Constant") c []])
-calleesFromTerm t = error ( "CalleesFromTerm not defined: " ++ show t)
--- calleesFromTerm (Proj t i) = error "CalleesFromTerm Proj not defined"
--- calleesFromTerm Erased = return []
--- calleesFromTerm Impossible = return []
--- calleesFromTerm (Inferred t) = do
---     (runIO . putStrLn) "Inferred "
---     translateTerm t
--- calleesFromTerm (TType i) = do
---     (runIO . putStrLn) $ "TType " ++ show i
--- calleesFromTerm (UType u) = do
---     (runIO . putStrLn) $ "UType " ++ show u
+calleesFromTerm p@(P _ n _) = fmap maybeToList (toCallee n)
+calleesFromTerm (V i) = return []
+calleesFromTerm bi@(Bind n b t) = do
+  bCallees <- calleesFromBinder b
+  argBCallees <- (fmap concat . mapM calleesFromArguments) bCallees
+  returnTypeBCallees <- (fmap concat . mapM calleesFromReturnType) bCallees
 
-calleesFromArguments :: Maybe Callee -> Idris [Callee]
-calleesFromArguments Nothing = return []
-calleesFromArguments (Just callee) = (fmap concat . mapM calleesFromTerm . cArguments) callee
+  callees <- calleesFromTerm t
+  argCallees <- (fmap concat . mapM calleesFromArguments) callees
+  returnTypeCallees <- (fmap concat . mapM calleesFromReturnType) callees
+  return (argCallees ++ returnTypeCallees ++ callees ++
+          argBCallees ++ returnTypeBCallees ++ bCallees)
+calleesFromTerm (App _ f a) = do
+  maybeCallee <- fmap headMay (calleesFromTerm f)
+  let uMaybeCallee = fmap (\c -> c{cArguments = cArguments c ++ [a]}) maybeCallee
+  argCallees <- maybe (return []) calleesFromArguments uMaybeCallee
+  returnTypeCallees <- maybe (return []) calleesFromReturnType uMaybeCallee
+  return (maybe [] (\c -> c : (argCallees ++ returnTypeCallees)) uMaybeCallee)
+calleesFromTerm c@(Constant _) = return ([Callee (sUN "Constant") c []])
+calleesFromTerm (Proj t _) = calleesFromTerm t
+calleesFromTerm Erased = return []
+calleesFromTerm Impossible = return []
+calleesFromTerm (Inferred t) = calleesFromTerm t
+calleesFromTerm (TType i) = return []
+calleesFromTerm (UType u) = return []
+
+calleesFromReturnType :: Callee -> Idris [Callee]
+calleesFromReturnType callee = (calleesFromTerm . cReturnType) callee
+
+calleesFromArguments :: Callee -> Idris [Callee]
+calleesFromArguments callee = (fmap concat . mapM calleesFromTerm . cArguments) callee
 
 calleesFromSC :: SC -> Idris [Callee]
 calleesFromSC (STerm tm) = calleesFromTerm tm
 calleesFromSC sc = error ( "calleesFromSC pattern not captured: " ++ show sc)
+
+calleesFromBinder :: Binder (TT Name) -> Idris [Callee]
+calleesFromBinder (Lam _ b) = calleesFromTerm b
+calleesFromBinder (Pi _ _ b _) = calleesFromTerm b
+calleesFromBinder (Let b _) = calleesFromTerm b
+calleesFromBinder (NLet b _) = calleesFromTerm b
+calleesFromBinder (Hole b) = calleesFromTerm b
+calleesFromBinder (GHole _ _ b) = calleesFromTerm b
+calleesFromBinder (Guess b _) = calleesFromTerm b
+calleesFromBinder (PVar _ b) = calleesFromTerm b
+calleesFromBinder (PVTy b) = calleesFromTerm b
 
 translateMain :: Idris ()
 translateMain = do
