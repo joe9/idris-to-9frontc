@@ -546,6 +546,18 @@ translateFile filename = do
     --                                              (group . align $ pprintDelabTy ist n))
     --                                       names))
   (runIO . putStrLn . groom) callees
+  STOPPING HERE
+  There is no point continuing this effort. It is more important to carry the Haskell principles forward rather than translating haskell to C
+  -- Record: Translate and build declarations for Records and remove the
+  --         records and record constructors from the callees list
+  -- Data: Translate and build declarations for Data and remove the
+  --       records and data constructors from the callees list
+  -- Type: Translate and build declarations for type and remove the
+  --       type from the callees list
+  -- Function: Translate and build declarations for function and remove the
+  --       function from the callees list
+  use something like this instead of the mapM used below
+  (recordCdecls, calleesWithoutRecords) <- foldlM translateCalleeToC callees
   cdecls <- (fmap concat . mapM translateCalleeToC) callees
   (outputAST . toCProgram) cdecls
   return ()
